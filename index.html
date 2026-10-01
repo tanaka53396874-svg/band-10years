@@ -1,0 +1,157 @@
+<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>BAND 10 YEARS v0.5</title>
+<style>body{font-family:system-ui;background:#101114;color:#eee;max-width:820px;margin:auto;padding:18px;line-height:1.65}section,.card{margin:14px 0}.card,.y,.res,.epi{background:#191b20;border:1px solid #353942;border-radius:12px;padding:15px}.y{margin:10px 0;border-left:3px solid #777}button,select{font:inherit;padding:10px 13px;margin:4px;color:#eee;background:#282c34;border:1px solid #555;border-radius:8px}button{cursor:pointer}.on,.primary{background:#eee;color:#111}.hide{display:none}.muted{color:#aaa;font-size:13px}.member{padding:10px 0;border-bottom:1px solid #333}.status{font-size:20px;font-weight:bold}.choices{display:flex;flex-wrap:wrap}.sep{border-top:1px solid #444;margin:12px 0}</style>
+<section id="setup"><h1>BAND 10 YEARS <span class="muted">v0.5 通しプレイ版</span></h1><p class="muted">10年モード：選択→メンバー→追加人物→10年間→RESULT→EPILOGUE</p>
+<div class="card"><b>アナタのパートを選んでください</b><div class="choices" id="part"></div></div>
+<div class="card"><b>BAND STYLE</b><div class="choices" id="genre"></div>
+<div id="subbox" class="hide" style="margin-top:14px;padding-top:12px;border-top:1px solid #3b4049">
+<b>さらに音楽性を絞り込む（任意）</b>
+<p class="muted" style="margin:4px 0 8px">選択すると、その音楽性を好むメンバーが出やすくなります。指定しない場合はBAND STYLEの中から幅広く選ばれます。</p>
+<select id="sub"><option>指定しない</option></select></div></div>
+<div class="card"><b>音楽の好み</b><div class="choices" id="taste"></div></div><div class="card"><b>男女構成</b><div class="choices" id="gender"></div></div><button class="primary" onclick="gen()">メンバーを見る</button></section>
+<section id="members" class="hide"><h2>この3人で始めますか？</h2><div id="ml" class="card"></div><button class="primary" onclick="accept()">YES</button><button onclick="gen()">NO — 3人とも再選択</button><button onclick="backSetup()">← 前の画面に戻る</button><button onclick="oneByOne()">メンバーを1人ずつ選ぶ →</button><p class="muted">前の画面に戻ると、BAND STYLEやサブジャンルなどを選び直せます。</p><div id="ind" class="hide card"></div></section>
+<section id="extra" class="hide"><h2>もうひとり</h2><div id="xc" class="card"></div><button class="primary" onclick="start()">このメンバーで10年を始める</button></section>
+<section id="game" class="hide"><div class="card"><h1 id="bn"></h1><div id="meta" class="muted"></div><div id="roster"></div></div><div id="tl"></div><div id="rr"></div><div id="ep"></div><button class="primary" onclick="resetGame()">最初からもう一度</button><button onclick="play()">同じメンバーでもう一度</button></section>
+<script>
+const P=a=>a[Math.random()*a.length|0],C=p=>Math.random()<p,R=(a,b)=>Math.floor(a+Math.random()*(b-a+1)),F=n=>n.toLocaleString('ja-JP');
+const PART=['Vo','G','B','Ds'],GEN=['ROCK','POP','R&B・SOUL','FUNK・JAZZ'],TASTE=['邦楽中心','洋楽中心','どちらも'],SEX=['MEN ONLY','WOMEN ONLY','MIXED'];
+const SUB={'ROCK':['指定しない','Classic Rock','Hard Rock','Punk','Metal','Alternative Rock','Indie Rock','Grunge','Shoegaze','Visual Kei'],'POP':['指定しない','J-Pop','Pop Rock','Power Pop','Indie Pop','Synth Pop','City Pop'],'R&B・SOUL':['指定しない','R&B','Soul','Neo Soul','Motown','Gospel','HipHop Soul'],'FUNK・JAZZ':['指定しない','Funk','Jazz','Fusion','Acid Jazz','Disco']};
+const MN=['RYO','KENTA','SHINJI','TAKU','KOJI','HIRO','YUJI','TETSU','SHUN','KAI','REN','HIKARU','KEI'],FN=['MAI','NANA','MIKA','YUKA','RINA','ERI','MARI','AYA','SAKI','MIO','REI','RIN','AOI','YUI'];
+// v0.5: BAND STYLE → 好きなジャンル → 好きなミュージシャンを連動。
+// 完全固定ではなく、少数だけ隣接ジャンルから混ざる。
+const STYLE_GENRES={
+'ROCK':['Classic Rock','Hard Rock','Punk','Metal','Alternative Rock','Indie Rock','Grunge','Shoegaze','Visual Kei','Pop Rock'],
+'POP':['J-Pop','Pop Rock','Power Pop','Indie Pop','Synth Pop','City Pop'],
+'R&B・SOUL':['R&B','Soul','Neo Soul','Motown','Gospel','HipHop Soul'],
+'FUNK・JAZZ':['Funk','Jazz','Fusion','Acid Jazz','Disco']
+};
+const ART=[
+{name:'LUNA SEA',jp:1,g:['Visual Kei','Alternative Rock','Hard Rock']},
+{name:'X JAPAN',jp:1,g:['Visual Kei','Metal','Hard Rock']},
+{name:"B'z",jp:1,g:['Hard Rock','Pop Rock']},
+{name:'スピッツ',jp:1,g:['J-Pop','Pop Rock','Indie Pop']},
+{name:'椎名林檎',jp:1,g:['J-Pop','Alternative Rock','Jazz']},
+{name:'東京事変',jp:1,g:['Alternative Rock','Jazz','Pop Rock']},
+{name:'宇多田ヒカル',jp:1,g:['R&B','J-Pop','Neo Soul']},
+{name:'Suchmos',jp:1,g:['Funk','Acid Jazz','Soul']},
+{name:'山下達郎',jp:1,g:['City Pop','Soul','J-Pop']},
+{name:'Superfly',jp:1,g:['Soul','Pop Rock','Hard Rock']},
+{name:'くるり',jp:1,g:['Indie Rock','Alternative Rock','J-Pop']},
+{name:'Radiohead',jp:0,g:['Alternative Rock','Indie Rock']},
+{name:'Nirvana',jp:0,g:['Grunge','Alternative Rock']},
+{name:'Oasis',jp:0,g:['Indie Rock','Pop Rock']},
+{name:'Foo Fighters',jp:0,g:['Alternative Rock','Hard Rock']},
+{name:'The Cure',jp:0,g:['Alternative Rock','Indie Rock']},
+{name:'Metallica',jp:0,g:['Metal','Hard Rock']},
+{name:'The Beatles',jp:0,g:['Classic Rock','Pop Rock','Power Pop']},
+{name:'Prince',jp:0,g:['Funk','Soul','R&B']},
+{name:'Stevie Wonder',jp:0,g:['Soul','Motown','Funk']},
+{name:'Jamiroquai',jp:0,g:['Acid Jazz','Funk','Disco']},
+{name:"D'Angelo",jp:0,g:['Neo Soul','R&B','Soul']},
+{name:'Red Hot Chili Peppers',jp:0,g:['Funk','Alternative Rock','Hard Rock']},
+{name:'Miles Davis',jp:0,g:['Jazz','Fusion']},
+{name:'Herbie Hancock',jp:0,g:['Jazz','Fusion','Funk']},
+{name:'Chic',jp:0,g:['Disco','Funk']},
+{name:'Marvin Gaye',jp:0,g:['Soul','Motown','R&B']},
+{name:'Aretha Franklin',jp:0,g:['Soul','Gospel','R&B']}
+];
+const BANDS=['午後四時の彗星','月面駐車場','終電観測所','夕焼け保管庫','夜明け仮営業','MONDAY GARAGE','ORANGE FEEDBACK','RAIN CALENDAR','MOON RECEIPT'],SONGS=['午前四時保管庫','雨音','月曜だけ無重力','猫にセットリストを踏まれた','THIS IS NEVER NEVER PEN','帰れない水曜日','青空不在','水平線の忘れ物','SUNDAY VOLTAGE'];
+const XMEM=['Keyboard','2nd Guitar','DJ/Turntable','Sax','Percussion','Violin','尺八','和太鼓','Performer'],STAFF=['敏腕マネージャー','普通のマネージャー','ローディー','スタイリスト','覆面ソングライター'],DOG=['ココ','モカ','チョコ','マロン','レオ','ハナ','ソラ','ポンタ','ムギ','小鉄'],CAT=['モモ','ココ','ミルク','レオ','ソラ','リン','ハナ','ムギ','ルナ','トラ'];
+// 架空レーベル名（テスト用。公開前に名称衝突チェック予定）
+const LABELS=['BURNING EGG RECORDS','FUNNY BEAR RECORDS','MONDAY PANDA RECORDS','GOLDEN POTATO MUSIC','SLEEPY TIGER RECORDS','HAPPY NOISE RECORDS','BLUE BANANA MUSIC','LUCKY PENGUIN RECORDS','MIDNIGHT TOAST RECORDS','CRAZY LEMON MUSIC','SUNDAY ELEPHANT RECORDS','BLACK COFFEE RECORDS','PINK GORILLA MUSIC','SUNNY MONSTER RECORDS','SILVER CAT RECORDS','GOOD MORNING RECORDS','YELLOW ROCKET MUSIC','COLD PIZZA RECORDS','MOONLIGHT CHICKEN RECORDS','RAINY DOG MUSIC'];
+function majorDebut(){
+ let l=P(LABELS);
+ return P([
+ `複数のメジャーレーベルからオファー。メンバーで何度も話し合った末、${l}からメジャーデビュー🎉`,
+ `ライブを見ていた関係者から、思いがけないオファー。${l}からメジャーデビュー🎉`,
+ `これまでレーベルとの話は何度か流れていた。そんな中、偶然舞い込んだ貴重なオファーを受け、${l}からメジャーデビュー🎉`,
+ `作品への評価が業界内で広がり、${l}との契約が決定。メジャーデビュー🎉`,
+ `海外での反応に目をつけた${l}からオファー。予想外の経路でメジャーデビュー🎉`
+ ]);
+}
+let cfg={},mem=[],xtra=null,locks={};
+function mkBtns(id,a,k){document.getElementById(id).innerHTML=a.map(v=>`<button onclick="sel('${id}','${v}','${k}')">${v}</button>`).join('')}function sel(id,v,k){cfg[k]=v;[...document.getElementById(id).children].forEach(b=>b.classList.toggle('on',b.textContent===v));if(k==='genre'){document.getElementById('subbox').classList.remove('hide');document.getElementById('sub').innerHTML=SUB[v].map(z=>`<option>${z}</option>`).join('')}}
+mkBtns('part',PART,'part');mkBtns('genre',GEN,'genre');mkBtns('taste',TASTE,'taste');mkBtns('gender',SEX,'gender');
+function sx(){return cfg.gender==='MEN ONLY'?'♂':cfg.gender==='WOMEN ONLY'?'♀':C(.5)?'♂':'♀'}
+function nm(s,u=[]){let a=(s==='♂'?MN:FN).filter(z=>!u.includes(z));return P(a)}
+function favGenre(){
+ let base=[...STYLE_GENRES[cfg.genre]];
+ if(cfg.sub&&cfg.sub!=='指定しない'&&C(.68))return cfg.sub;
+ // 85%は選択STYLE内、15%だけ隣接/外側を許す
+ if(C(.85))return P(base);
+ let adjacent={'ROCK':['Pop Rock','Funk'],'POP':['Soul','Alternative Rock'],'R&B・SOUL':['Funk','J-Pop'],'FUNK・JAZZ':['Soul','R&B','Alternative Rock']};
+ return P(adjacent[cfg.genre]);
+}
+function artistFor(g){
+ let candidates=ART.filter(a=>a.g.includes(g));
+ // たまに近縁候補。ただしPunk→Stevie Wonderのような無関係抽選はしない
+ if(!candidates.length)candidates=ART.filter(a=>a.g.some(x=>STYLE_GENRES[cfg.genre].includes(x)));
+ let tastePool=candidates.filter(a=>cfg.taste==='どちらも'||(cfg.taste==='邦楽中心'?a.jp:!a.jp));
+ if(tastePool.length&&C(.88))candidates=tastePool;
+ return P(candidates).name;
+}
+function mm(p,u){let s=sx(),fav=favGenre();return{part:p,name:nm(s,u),sex:s,fav,artist:artistFor(fav)}}function mh(m){return`<div class="member"><b>${m.part}　${m.name} ${m.sex}</b><br><span class="muted">好きなジャンル：${m.fav}<br>好きなミュージシャン：${m.artist}</span></div>`}
+function gen(){if(!cfg.part||!cfg.genre||!cfg.taste||!cfg.gender){alert('すべて選んでください');return}cfg.sub=document.getElementById('sub').value;let u=[];mem=PART.filter(p=>p!==cfg.part).map(p=>{let m=mm(p,u);u.push(m.name);return m});document.getElementById('ml').innerHTML=mem.map(mh).join('');document.getElementById('setup').classList.add('hide');document.getElementById('members').classList.remove('hide');document.getElementById('ind').classList.add('hide');locks={}}
+function oneByOne(){let e=document.getElementById('ind');e.classList.remove('hide');e.innerHTML=mem.map((m,i)=>`<div>${mh(m)}<button ${locks[i]?'disabled':''} onclick="rer(${i})">別のメンバーを見る</button><button onclick="lock(${i})">決定</button></div>`).join('')}function rer(i){if(locks[i])return;mem[i]=mm(mem[i].part,mem.filter((_,j)=>j!==i).map(m=>m.name));oneByOne()}function lock(i){locks[i]=1;oneByOne()}
+function backSetup(){document.getElementById('members').classList.add('hide');document.getElementById('ind').classList.add('hide');document.getElementById('setup').classList.remove('hide');locks={};scrollTo({top:0,behavior:'smooth'})}
+function accept(){makeX();document.getElementById('members').classList.add('hide');document.getElementById('extra').classList.remove('hide')}
+function makeX(){let u=mem.map(m=>m.name),r=Math.random();if(r<.45){let role=P(XMEM),s=sx();xtra={kind:'member',role,name:nm(s,u),sex:s}}else if(r<.9){let role=P([...STAFF,'金持ちの友人','ヒモ']),s=C(.5)?'♂':'♀';xtra={kind:STAFF.includes(role)?'staff':'mystery',role,name:role==='覆面ソングライター'?'???':nm(s,u),sex:s}}else{let d=C(.5);xtra={kind:'pet',role:d?'愛犬':'愛猫',name:P(d?DOG:CAT),sex:''}}let label=xtra.role,intro=xtra.kind==='member'?'この人もバンドに加わります。':xtra.kind==='staff'?'この人がバンドを支えます。':xtra.kind==='pet'?'バンドのマスコットに任命されました。':'この人もバンドと行動を共にします。';document.getElementById('xc').innerHTML=`<b>${label}　${xtra.name} ${xtra.sex}</b><p>${intro}</p>`}
+function who(m){return`${m.part}の${m.name}`}function xwho(){return xtra.kind==='member'?`${xtra.role}の${xtra.name}`:xtra.kind==='pet'?`${xtra.role}の${xtra.name}`:`${xtra.role}${xtra.name==='???'?'':'の'+xtra.name}`}
+function resetGame(){
+ document.getElementById('game').classList.add('hide');
+ document.getElementById('members').classList.add('hide');
+ document.getElementById('extra').classList.add('hide');
+ document.getElementById('ind').classList.add('hide');
+ document.getElementById('setup').classList.remove('hide');
+ cfg={};mem=[];xtra=null;locks={};
+ ['part','genre','taste','gender'].forEach(id=>[...document.getElementById(id).children].forEach(b=>b.classList.remove('on')));
+ document.getElementById('sub').innerHTML='<option>指定しない</option>';
+ document.getElementById('subbox').classList.add('hide');
+ scrollTo({top:0,behavior:'smooth'});
+}
+function start(){document.getElementById('extra').classList.add('hide');document.getElementById('game').classList.remove('hide');play()}
+function play(){let player={part:cfg.part,name:'アナタ'},all=[player,...mem],s1=P(SONGS),s2=P(SONGS.filter(s=>s!==s1)),q=Math.random(),dest=q<.4?'success':q<.8?'breakup':'other',Y={},used=new Set(),major=false,split=false,dep=null,over=false,peak=false,band=P(BANDS);const A=(y,id,t)=>{if(!used.has(id)){used.add(id);Y[y]=t}};
+let first=P([
+`初ライブは小さなライブハウス。客席にはメンバーの知人もかなり混じっていた。`,
+`最初の一曲「${s1}」を4人で完成。ここからバンドの曲作りが始まる。`,
+`結成から数か月で自主制作CDを発表。ライブ会場で手売りするところからスタート。`,
+`最初の楽曲「${s1}」を配信。再生数はまだ小さい。それでも、知らない誰かが聴いている。`,
+`活動開始直後にインディーズのコンピレーションCDへ参加。自分たちの名前が初めてCDの裏面に載った。`
+]);A(1,'start',`バンド名は「${band}」に決定、活動開始。${first}`);A(2,'seed',C(.5)?`新曲「${s1}」を発表。ライブでは、この曲だけ明らかに違う反応。`:`初ワンマン。満員には届かなかった。それでも、終演後に次の公演を待つ声が初めて聞こえた。`);
+let xt=xtra.kind==='pet'?`${xwho()}がMVにほんの数秒登場。コメント欄で一番多かった質問は「この子の名前は？」。`:xtra.kind==='member'?`${xwho()}の存在感がライブで急上昇。以前の曲まで、少し違って聞こえるようになる。`:xtra.role==='ヒモ'?`${xwho()}、なぜかツアーの打ち上げには毎回いる。メンバーの誰も、普段何をしている人なのかよく知らない。`:xtra.role==='金持ちの友人'?`${xwho()}が「一回くらい面白いことやろう」と、インディーズとは思えない妙に豪華なMV制作を手伝う。`:xtra.role==='ローディー'?`本番直前の機材トラブル。ローディーの${xtra.name}がその場で復旧し、開演は予定どおり。`:xtra.role==='普通のマネージャー'?`普通のマネージャーの${xtra.name}が持ってきた地方イベント。なぜかその街だけ、ここから客が増え始める。`:xtra.role==='敏腕マネージャー'?`敏腕マネージャーの${xtra.name}が大型イベントの出演枠を確保。まだ客席100人規模のバンドには、明らかに大きすぎる舞台。`:xtra.role==='スタイリスト'?`スタイリストの${xtra.name}が衣装を全面変更。音より先に写真が広がるという、少し複雑な展開。`:`覆面ソングライターから一曲届く。クレジットの名前は「???」。メンバーも正体を知らない。`;A(3,'extra',xt);
+let d=P(mem),leave=C(dest==='breakup'?.55:.32);
+if(dest==='success'){A(4,'break',C(.5)?`「${s1}」が映像作品に使用される。放送後、MV再生数が一週間でそれまでの総数を突破。`:`大型イベント出演を境に客層が一変。次のワンマンは、発売当日に完売。`);A(5,'major',majorDebut());major=true;if(leave){A(6,'peak',`初の大規模ワンマン、完売。${F(R(5000,16000))}人。結成以来、最大の夜。`);peak=true;A(7,'leave',`${who(d)}、脱退。`);dep=d;A(8,'after',xtra.kind==='member'?`${d.part}不在のままツアーへ。${xwho()}を含む現在の編成でステージを作り直すことになる。`:`残ったメンバーで活動続行。ツアー規模は半分以下になった。`);A(9,'rebound',`インディーズへ戻って最初のワンマン。${F(R(500,2200))}席が完売。大きさは変わった。それでも客席は埋まった。`)}else{let z=R(0,2);if(z===0){let v=all.find(m=>m.part==='Vo');A(6,'individual',`${who(v)}、連続ドラマの主要キャストに抜擢。街ではバンド名より先に${v.name}の名前を知られるようになる。`);A(7,'few','バンドとしてステージに立ったのは、この年3回だけ。');A(8,'rare','ところが、その3回すべて完売。活動回数と会場規模が反比例し始める。')}else if(z===1){A(6,'overseed',`「${s1}」への海外コメントが急増。最初に届いた海外公演のオファーは、日本のワンマンより大きな会場だった。`);over=true;A(7,'overlive','初の海外公演。最初に聞こえてきた大合唱は、日本語。');A(8,'overfest',`${F(R(25000,65000))}人の前でプレイ。海外の大規模フェス。`)}else{A(6,'hit2',`新曲「${s2}」がヒット。前作より速いペースで広がる。`);A(7,'arena',`${F(R(7000,20000))}人規模のワンマンへ。チケット完売。`);A(8,'odd',xtra.kind==='pet'?`${xwho()}のグッズ、完売。新作CDはまだ残っていた。`:'全国ツアー。複数会場で過去最大動員を更新。')}A(9,'late',C(.5)?'活動ペースを落とすと発表。それでも周年ライブは即日完売。':'結成9年目、最大規模の全国ツアー。');peak=true}}
+else if(dest==='breakup'){if(C(.65)){A(4,'oldviral',`なぜか売れたのは新曲ではなく、2年前の「${s1}」。短い動画で使われ始め、数週間で景色が変わる。`);A(5,'major',majorDebut());major=true;A(6,'peak',`${F(R(6000,22000))}人規模のワンマン、完売。バンド史上最大の動員。`);peak=true;if(leave){A(7,'leave',`${who(d)}、脱退。発表はツアー最終日の翌朝だった。`);dep=d;A(8,'contract','メジャー契約終了。残ったメンバーはインディーズで続けることを選ぶ。')}else{A(7,'fracture','次作の方向性をめぐる話し合いが長期化。予定されていたツアーは中止。');A(8,'contract','メジャー契約終了。4人はインディーズへ戻る。')}A(9,'final','最後のワンマン。終演後、解散を発表。');split=true}else{A(4,'local','地方の一都市だけ妙に人気が伸び、初めてその街のワンマンが完売。');if(leave){A(5,'leave',`${who(d)}、脱退。`);dep=d;A(6,'continue','サポートメンバーを迎えて活動続行。以前より小さな会場から、もう一度。')}else{A(5,'hit2',`新曲「${s2}」を発表。これまでで一番反応は大きい。それでも活動規模はほとんど変わらない。`);A(6,'life','メンバーの生活が変わり、全員で予定を合わせることが難しくなる。')}A(7,'few','この年のライブは3本。');A(8,'talk','久しぶりに全員で集まった夜、今後について話す。');A(9,'split','解散。最後のライブは、結成初期によく出演していたライブハウス。');split=true}}
+else{A(4,'local','一都市だけ客が増え続け、ついにその街ではワンマン完売。');if(leave){A(5,'leave',`${who(d)}、脱退。`);dep=d;A(6,'replacement',xtra.kind==='member'?`${xwho()}を含む編成で活動を継続。派手な再出発ではない。ただ、ライブは止まらなかった。`:'サポートを入れて活動続行。以前よりライブ本数を減らす。')}else{A(5,'hit2',`新曲「${s2}」がライブの定番に。派手なヒットではないが、この曲を待つ客が増える。`);A(6,'label','レーベルから声がかかる。しかし契約には至らず。活動はそのまま続行。')}A(7,'pace','年間のライブ本数を減らし、全員が続けられるペースへ。');A(8,'bigindie',`結成以来最大のワンマン。${F(R(300,1800))}人。客席には、何年も見覚えのある顔。`);A(9,'still','9年目。メンバーが揃うのは月に数回。それでも次のライブ日程は決まっている。')}
+let status,desc;if(split){status='解散';desc=major?'メジャーでの活動と、その後のインディーズ期を経て9年目に活動終了。':'9年目に活動終了。'}else if(dest==='success'&&dep){status='インディーズで活動中';desc=`${who(dep)}の脱退後、編成と活動規模を変えて継続中。`}else if(dest==='success'){status='メジャーで活動中';desc=over?'国内ツアーに加え、海外公演も継続中。':'全国ツアーや大型公演を中心に活動中。'}else{status=C(.5)?'インディーズで活動中':'活動規模を縮小して継続中';desc='年に数回から十数回のライブを続けている。'}let res={status,desc,rep:C(.7)?s1:s2,views:dest==='success'?R(8000000,180000000):major?R(1000000,80000000):R(500,900000),live:dest==='success'?R(2500,30000):major?R(1200,22000):R(50,1800),fest:(over||peak)&&C(.7)?R(12000,65000):null};render({Y,band,dest,major,split,dep,over,peak,res})}
+function render(s){document.getElementById('bn').textContent=s.band;document.getElementById('meta').textContent=`${cfg.genre}${cfg.sub!=='指定しない'?' / '+cfg.sub:''} ｜ アナタ：${cfg.part}`;document.getElementById('roster').innerHTML=mem.map(mh).join('')+`<div class="member"><b>${xtra.role}　${xtra.name} ${xtra.sex}</b></div>`;document.getElementById('tl').innerHTML=Object.keys(s.Y).map(y=>`<div class="y"><b>${y}年目</b>　${s.Y[y]}</div>`).join('');let r=s.res;document.getElementById('rr').innerHTML=`<div class="res"><b>10年目 — RESULT</b><div class="status">現在：${r.status}</div>${r.desc}<div class="sep"></div>代表曲「${r.rep}」<br>MV再生数　${F(r.views)}回<br>ワンマンLIVE 最大動員　${F(r.live)}人${r.fest?`<br>最大フェス出演　${F(r.fest)}人の前でプレイ`:''}</div>`;document.getElementById('ep').innerHTML=epi(s)}
+function epi(s){
+let r=s.res,yr=P([18,23,27,31,35]),t,mode=Math.random(),m1=mem[0],m2=mem[1],m3=mem[2];
+if(mode<.34){
+ if(r.status==='解散')t=C(.45)?`解散後、メンバーはそれぞれ別の道へ。${s.dep?who(s.dep)+'も別の音楽活動を続けた。':''} ${yr-4}年目、代表曲「${r.rep}」が思いがけず再び注目され、元メンバーにライブ出演の話が届く。全員が同じステージに立つのは解散以来初めて。「再結成ではない」と言ったが、そのライブは翌年も行われた。`:`解散後、全員が同じステージに立つことはなかった。音楽を続けたメンバーもいれば、別の仕事に移ったメンバーもいる。ある日、アナタは店内で代表曲「${r.rep}」を耳にする。隣の客は口ずさんでいたが、演奏している本人がすぐ横にいることには気づかなかった。`;
+ else if(r.status.includes('メジャー'))t=C(.55)?`10年目以降もメジャーで活動を継続。${R(12,17)}年目、メンバーの個人活動が増えたことをきっかけに活動ペースを落とし、その数年後のツアーを最後に解散した。現在はそれぞれ別の活動へ。近所の少年に「おじさん、学生の頃バンドでもやってたの？」と聞かれ、アナタは少し考えて「まあ、ちょっとね」と答えた。`:`10年目以降も活動は続き、ライブ本数こそ減ったものの、周年公演には今も大きな会場が使われている。昔ほど毎日顔を合わせることはない。それでも本番では、曲の入り方を確認する会話すらほとんど必要ない。${yr}年目の楽屋でも、話題は演奏より帰りの夕食だった。`;
+ else t=C(.5)?`10年目以降もインディーズで活動を継続。規模を追うことはやめ、年に数回だけ同じメンバーでステージに立つ形が定着した。${yr}年目、結成初期から出演していたライブハウスで周年ライブを開催。客席には、10年以上前から見覚えのある顔が何人もいた。`:`その後もしばらく活動を続けたが、${R(13,19)}年目を最後にライブ予定が入らなくなった。解散の発表はしていない。メンバーのグループチャットだけは残り、引っ越し中に昔のライブ映像を見つけたアナタが送ると、その夜は午前3時まで通知が止まらなかった。`;
+}else if(mode<.67){
+ // 長文パターンA：アナタ以外のメンバーの「その後」も追う
+ if(r.status==='解散')t=`10年目の時点ですでにバンドは解散していた。その後、${who(m1)}はサポート演奏や楽曲制作を続け、${who(m2)}は${R(12,17)}年目ごろから音楽以外の仕事が中心に。${who(m3)}は別のバンドに参加し、小規模ながらライブ活動を続けた。${yr-3}年目、代表曲「${r.rep}」が動画をきっかけに再び聴かれ始め、久しぶりに元メンバーのグループチャットが動く。全員が同じ場所に集まったのは、その翌年。再結成の話は出なかったが、最後にはなぜか「今やるなら何の曲から始めるか」を話していた。`;
+ else t=`10年目以降もしばらくバンド活動を継続。${R(13,18)}年目に大きなツアーを終えたあと、活動を止めることになった。${who(m1)}はその後も音楽活動を続け、${who(m2)}は別の仕事をしながら年に数回だけ演奏。${who(m3)}は制作側へ回り、若いバンドの作品に名前が載るようになる。${yr}年目、4人が久しぶりに集まった理由はライブではなく、昔よく通っていた店の閉店。店を出たあと、誰からともなく「一曲くらいやる？」という話になった。`;
+}else{
+ // 長文パターンB：RESULTから現在までを時系列でつなぎ、他メンバーの人生も描く
+ if(r.status.includes('メジャー')){let end=R(14,20);t=`10年目以降もメジャーで活動を続け、${end}年目までは数年おきに全国ツアーを開催した。その頃には${who(m1)}の個人活動が増え、${who(m2)}も別アーティストの仕事に参加するようになり、全員が揃うのはバンドの本番だけになっていた。${end+2}年目、解散を発表。${who(m3)}はその後もステージに立ち続け、${who(m1)}は個人活動を継続している。${yr}年目、アナタが楽器を持って家を出たところを近所の少年に見つかる。「おじさん、学生の頃バンドでもやってたの？」。アナタは代表曲「${r.rep}」のMVが今も何千万回も再生されていることには触れず、「まあ、ちょっとね」とだけ答えた。`;}
+ else if(r.status==='解散')t=`解散から数年、メンバー同士で顔を合わせることはほとんどなかった。${who(m1)}は別の音楽活動へ、${who(m2)}は会社員になり、${who(m3)}は地元で時々演奏を続けた。${R(16,22)}年目、昔のライブ映像がネットで偶然見つかり、代表曲「${r.rep}」を初めて知る若いリスナーが増える。再結成を期待する声も出たが、特に何も発表しなかった。${yr}年目、元メンバー全員が久しぶりに同じ居酒屋へ。話題の大半は音楽ではなく健康診断と家の修理。それでも帰り際、${who(m1)}が「今ならあの曲、もう少し上手くできるな」と言った。`;
+ else t=`10年目以降も活動規模を大きく変えず、年に数回のライブを続けた。${who(m1)}は別の仕事と両立し、${who(m2)}はサポート演奏も開始。${who(m3)}はしばらく音楽から離れたが、周年ライブのときだけ戻ってくるようになる。${R(18,24)}年目、結成当初から使っていたライブハウスで久しぶりに全員が揃った。満員ではない。それでも最前列には10年以上前から知っている顔がいる。${yr}年目になっても解散の発表はない。次のライブ予定もまだない。ただし、メンバーのグループチャットの名前だけは今もバンド名のまま。`;
+}
+let last;
+if(xtra.role==='ヒモ') last=`${yr}年目になっても、アナタは${xtra.name}が何をしている人なのか知らない。もう聞くタイミングは完全に逃した。`;
+else if(t.includes('グループチャット')) last=P([
+ 'たまに誰かが「そろそろやる？」と書き込む。誰も断らないし、日程も決まらない。アナタも、そのチャットを消していない。',
+ '通知が来るたび、アナタは一度だけ予定表を開く。だいたい、そこで終わる。',
+ 'アナタの楽器は、今もすぐ手の届くところにある。'
+]);
+else last=P([
+ '帰り道、アナタは昔の曲を一曲だけ聴いた。',
+ 'アナタは少し笑って、それ以上は何も言わなかった。',
+ 'アナタの楽器は、今もすぐ手の届くところにある。',
+ '「もう一回くらいなら」とだけ、アナタは思った。'
+]);
+return`<div class="epi"><b>${yr} YEARS LATER — EPILOGUE</b><p>${t} ${last}</p></div>`}
+</script>
