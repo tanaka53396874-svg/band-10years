@@ -34,7 +34,6 @@ export async function onRequestGet({ params, env }) {
       method: "GET",
       headers: {
         apikey: env.SUPABASE_SECRET_KEY,
-        Authorization: `Bearer ${env.SUPABASE_SECRET_KEY}`,
         Accept: "application/json",
       },
     });
