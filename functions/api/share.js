@@ -66,12 +66,11 @@ export async function onRequestPost({ request, env }) {
       `${supabaseUrl}/rest/v1/band_shared_results`,
       {
         method: "POST",
-        headers: {
-          apikey: env.SUPABASE_SECRET_KEY,
-          Authorization: `Bearer ${env.SUPABASE_SECRET_KEY}`,
-          "Content-Type": "application/json",
-          Prefer: "return=minimal",
-        },
+headers: {
+  apikey: env.SUPABASE_SECRET_KEY,
+  "Content-Type": "application/json",
+  Prefer: "return=minimal",
+},
         body: JSON.stringify({
           id,
           result_data: result,
