@@ -1,0 +1,81 @@
+
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>バンドゲーム・保存APIテスト</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      max-width: 600px;
+      margin: 50px auto;
+      padding: 20px;
+      line-height: 1.7;
+    }
+    button {
+      padding: 12px 20px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    pre {
+      padding: 15px;
+      background: #f1f1f1;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+  </style>
+</head>
+<body>
+  <h1>保存APIテスト</h1>
+  <p>ボタンを押すと、Supabaseにテストデータを1件保存します。</p>
+
+  <button id="testButton">保存テストを実行</button>
+  <pre id="output">まだ実行していません。</pre>
+
+  <script>
+    const button = document.getElementById("testButton");
+    const output = document.getElementById("output");
+
+    button.addEventListener("click", async () => {
+      button.disabled = true;
+      output.textContent = "送信中...";
+
+      try {
+        const response = await fetch("/api/share", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            result: {
+              test: true,
+              title: "バンド、10年やってみた",
+              message: "Supabase保存テスト"
+            }
+          })
+        });
+
+        const data = await response.json();
+
+        output.textContent =
+          "HTTPステータス: " + response.status +
+          "\n結果: " + JSON.stringify(data, null, 2);
+
+        if (response.status === 201 && data.id) {
+          const link = document.createElement("a");
+          link.href = "/api/result/" + encodeURIComponent(data.id);
+          link.textContent = "保存したデータを読み出す";
+          link.style.display = "block";
+          link.style.marginTop = "15px";
+          output.after(link);
+        }
+      } catch (error) {
+        output.textContent = "通信エラー: " + error.message;
+      } finally {
+        button.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
