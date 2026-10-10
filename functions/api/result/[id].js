@@ -38,10 +38,17 @@ export async function onRequestGet({ params, env }) {
       },
     });
 
-    if (!response.ok) {
-      console.error("Supabase fetch failed:", response.status);
-      return jsonResponse({ error: "Could not load result" }, 502);
-    }
+if (!response.ok) {
+  const errorText = await response.text();
+
+  console.error("Supabase fetch failed:", {
+    status: response.status,
+    error: errorText.slice(0, 1000),
+  });
+
+  return jsonResponse({ error: "Could not load result" }, 502);
+}
+    
 
     const rows = await response.json();
 
