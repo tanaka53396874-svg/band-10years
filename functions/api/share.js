@@ -1,21 +1,47 @@
 
 const MAX_BODY_BYTES = 100000;
 const MAX_RESULT_BYTES = 80000;
+const RATE_LIMIT_SECONDS = 60;
 
-function jsonResponse(data, status = 200) {
+function jsonResponse(data, status = 200, extraHeaders = {}) {
   return new Response(JSON.stringify(data), {
     status,
     headers: {
       "Content-Type": "application/json; charset=utf-8",
       "Cache-Control": "no-store",
       "X-Content-Type-Options": "nosniff",
+      ...extraHeaders,
     },
   });
 }
 
+async function rateLimitKey(ip, secret) {
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const signature = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    encoder.encode(ip)
+  );
+  const hash = Array.from(new Uint8Array(signature))
+    .map(b => b.toString(16).padStart(2, "0"))
+    .join("");
+  return "share:" + hash;
+}
+
 export async function onRequestPost({ request, env }) {
   try {
-    if (!env.SUPABASE_URL || !env.SUPABASE_SECRET_KEY) {
+    if (
+      !env.SUPABASE_URL ||
+      !env.SUPABASE_SECRET_KEY ||
+      !env.BAND_RATE_LIMIT
+    ) {
       return jsonResponse({ error: "Server configuration error" }, 500);
     }
 
@@ -29,6 +55,13 @@ export async function onRequestPost({ request, env }) {
     const contentType = request.headers.get("Content-Type") || "";
     if (!contentType.toLowerCase().includes("application/json")) {
       return jsonResponse({ error: "JSON required" }, 415);
+    }
+
+    const contentLength = Number(
+      request.headers.get("Content-Length") || 0
+    );
+    if (contentLength > MAX_BODY_BYTES) {
+      return jsonResponse({ error: "Request too large" }, 413);
     }
 
     const bodyText = await request.text();
@@ -55,8 +88,34 @@ export async function onRequestPost({ request, env }) {
       return jsonResponse({ error: "Invalid result" }, 400);
     }
 
-    if (JSON.stringify(result).length > MAX_RESULT_BYTES) {
+    if (
+      Object.prototype.hasOwnProperty.call(result, "__proto__") ||
+      Object.prototype.hasOwnProperty.call(result, "constructor")
+    ) {
+      return jsonResponse({ error: "Invalid result" }, 400);
+    }
+
+    if (
+      new TextEncoder().encode(JSON.stringify(result)).length >
+      MAX_RESULT_BYTES
+    ) {
       return jsonResponse({ error: "Result too large" }, 413);
+    }
+
+    const ip = request.headers.get("CF-Connecting-IP");
+    if (!ip) {
+      return jsonResponse({ error: "Client information unavailable" }, 403);
+    }
+
+    const key = await rateLimitKey(ip, env.SUPABASE_SECRET_KEY);
+    const previous = await env.BAND_RATE_LIMIT.get(key);
+
+    if (previous !== null) {
+      return jsonResponse(
+        { error: "Too many requests. Please try again later." },
+        429,
+        { "Retry-After": String(RATE_LIMIT_SECONDS) }
+      );
     }
 
     const id = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
@@ -66,11 +125,11 @@ export async function onRequestPost({ request, env }) {
       `${supabaseUrl}/rest/v1/band_shared_results`,
       {
         method: "POST",
-headers: {
-  apikey: env.SUPABASE_SECRET_KEY,
-  "Content-Type": "application/json",
-  Prefer: "return=minimal",
-},
+        headers: {
+          apikey: env.SUPABASE_SECRET_KEY,
+          "Content-Type": "application/json",
+          Prefer: "return=minimal",
+        },
         body: JSON.stringify({
           id,
           result_data: result,
@@ -81,6 +140,14 @@ headers: {
     if (!response.ok) {
       console.error("Supabase insert failed:", response.status);
       return jsonResponse({ error: "Could not save result" }, 502);
+    }
+
+    try {
+      await env.BAND_RATE_LIMIT.put(key, "1", {
+        expirationTtl: RATE_LIMIT_SECONDS,
+      });
+    } catch (error) {
+      console.error("Rate limit record failed:", error);
     }
 
     return jsonResponse({ id }, 201);
